@@ -11,6 +11,7 @@
     "clean": "rimraf .next"
   },
   "dependencies": {
+    "@mastra/mcp": "^0.13.1",
     "cedar-os": "^0.1.21",
     "next": "15.5.4",
     "react": "19.1.0",

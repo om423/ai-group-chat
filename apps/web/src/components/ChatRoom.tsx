@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { generalHelper, mcpAgent, codingAssistant, weatherSpecialist } from "@/mastra";
 import { io } from "socket.io-client";
 import { sendChatMessage } from "@/lib/chat";
 
@@ -14,6 +15,8 @@ interface Message {
   timestamp: Date;
   type: "user" | "ai";
   name: string;
+  agent?: string;
+  toolUsed?: string;
 }
 
 interface ChatRoomProps {
@@ -27,7 +30,15 @@ export default function ChatRoom({ roomId, onLogout }: ChatRoomProps) {
   const [message, setMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [asRole, setAsRole] = useState("Student"); // Default role
+  const [selectedAgent, setSelectedAgent] = useState("generalHelper");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const agents = {
+    generalHelper: { name: "General Helper", description: "Can help with weather, files, and code analysis" },
+    mcpAgent: { name: "MCP Agent", description: "Uses tools from MCP servers" },
+    codingAssistant: { name: "Coding Assistant", description: "Specialized in code analysis and development" },
+    weatherSpecialist: { name: "Weather Specialist", description: "Expert in weather information" },
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -113,8 +124,23 @@ export default function ChatRoom({ roomId, onLogout }: ChatRoomProps) {
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
+            <div className="flex items-center space-x-4">
               <h1 className="text-xl font-semibold text-gray-900">AI Chat - {roomId}</h1>
+              <div className="flex items-center space-x-2">
+                <label htmlFor="agent-select" className="text-sm text-gray-600">Agent:</label>
+                <select
+                  id="agent-select"
+                  value={selectedAgent}
+                  onChange={(e) => setSelectedAgent(e.target.value)}
+                  className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  {Object.entries(agents).map(([key, agent]) => (
+                    <option key={key} value={key}>
+                      {agent.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
@@ -199,6 +225,16 @@ export default function ChatRoom({ roomId, onLogout }: ChatRoomProps) {
                         <span className="text-sm font-medium text-gray-900">
                           {message.name}
                         </span>
+                        {message.agent && (
+                          <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
+                            {agents[message.agent as keyof typeof agents]?.name}
+                          </span>
+                        )}
+                        {message.toolUsed && (
+                          <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full">
+                            🔧 {message.toolUsed}
+                          </span>
+                        )}
                         <span className="text-xs text-gray-500">
                           {formatTime(message.timestamp)}
                         </span>
@@ -412,4 +448,5 @@ export default function ChatRoom({ roomId, onLogout }: ChatRoomProps) {
     </div>
   );
 }
+
 

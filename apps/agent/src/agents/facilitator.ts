@@ -6,6 +6,7 @@ import { postAsAgentImpl } from "../tools/postAsAgent";
 import { summarizeImpl } from "../tools/summarizeWindow";
 import { getPrincipalFromMsg } from "./principalFromMsg";
 import { Rooms } from "../state/rooms";
+import { MessageModel } from "../db/models";
 
 const COOLDOWN_MS = 20_000; // simple debounce to avoid spam
 
@@ -37,8 +38,13 @@ export async function maybeRespondToUserMessage(msg: { roomId: string; authorId:
   const explicit = /^(@ai|\/ai)\b/i.test(trimmed);
   const cleaned = explicit ? trimmed.replace(/^(@ai|\/ai)\s*/i, "") : trimmed;
 
-  const recent = ChatState.recent(msg.roomId, 12).map(m => `${m.authorType}:${m.text}`);
-  const recentPairs = ChatState.recent(msg.roomId, 8).map(m => ({
+  // Get recent messages from MongoDB
+  const recentMessages = await MessageModel.find({ roomId: msg.roomId })
+    .sort({ ts: -1 })
+    .limit(12);
+  
+  const recent = recentMessages.reverse().map(m => `${m.authorType}:${m.text}`);
+  const recentPairs = recentMessages.slice(-8).reverse().map(m => ({
     role: m.authorType === "Agent" ? "assistant" : "user",
     content: m.text
   }));
@@ -63,7 +69,8 @@ export async function maybeRespondToUserMessage(msg: { roomId: string; authorId:
   const principal = getPrincipalFromMsg({ type: "Agent", id: "facilitator", orgId: "org-1", name: "FacilitatorAgent" });
 
   // Optionally summarize if conversation is long (demo: > 15 msgs)
-  if (ChatState.recent(msg.roomId, 100).length > 15) {
+  const totalMessages = await MessageModel.countDocuments({ roomId: msg.roomId });
+  if (totalMessages > 15) {
     try {
       await execSummarize(principal, summarizeImpl, { roomId: msg.roomId, k: 30 });
     } catch { /* ignore summarizes denied */ }

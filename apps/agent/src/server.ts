@@ -7,6 +7,12 @@ import fs from "node:fs";
 import http from "node:http";
 import { Server as IOServer } from "socket.io";
 
+import { connectMongo } from "./db/mongo";
+import { MessageModel, RoomModel } from "./db/models";
+
+// Connect to MongoDB
+connectMongo().then(() => console.log("[agent] Mongo connected"));
+
 import { validateCreateThread, execCreateThread, createThreadImpl } from "./tools/createThread";
 import { validateSummarizeWindow, execSummarizeWindow, summarizeImpl } from "./tools/summarizeWindow";
 import { getPrincipalFromReq } from "./auth/principal";
@@ -245,23 +251,49 @@ function emitChatMessage(msg: ChatMsg) {
 app.post("/chat/send", async (req, res) => {
   const { roomId = "r1", text = "" } = req.body || {};
   const principal = getPrincipalFromReq(req);
-  const msg: ChatMsg = {
-    id: `m_${Math.random().toString(36).slice(2)}`,
+
+  // ensure room exists (seed default org)
+  await RoomModel.updateOne(
+    { roomId }, 
+    { $setOnInsert: { roomId, name: `Room ${roomId}`, orgId: "org-1" }}, 
+    { upsert: true }
+  );
+
+  const msg = await MessageModel.create({
     roomId,
     authorType: principal.type,
-    authorId: principal.type === "User" ? (principal.id || "u-unknown") : (principal.name || "Agent"),
+    authorId: principal.type === "User" ? principal.id : (principal.name || "Agent"),
     text: String(text),
     ts: Date.now()
-  };
-  ChatState.push(msg);
-  emitChatMessage(msg);
+  });
 
-  // Only react to User messages
+  io.emit("chat:message", msg.toObject());
+
   if (principal.type === "User") {
     maybeRespondToUserMessage({ roomId, authorId: principal.id!, text });
   }
 
   res.json({ ok: true, message: msg });
+});
+
+// Last N messages for a room
+app.get("/chat/:roomId/history", async (req, res) => {
+  const n = parseInt(String(req.query.limit || "50"), 10);
+  const rows = await MessageModel.find({ roomId: req.params.roomId }).sort({ ts: 1 }).limit(n);
+  res.json({ ok: true, messages: rows });
+});
+
+// Your rooms (simple)
+app.get("/rooms", async (_req, res) => {
+  const rooms = await RoomModel.find().sort({ updatedAt: -1 }).limit(20);
+  res.json({ ok: true, rooms });
+});
+
+// Create room
+app.post("/rooms", async (req, res) => {
+  const { roomId, name } = req.body;
+  const doc = await RoomModel.create({ roomId, name, orgId: "org-1" });
+  res.json({ ok: true, room: doc });
 });
 
 server.listen(PORT, () => console.log(`[agent] listening on :${PORT}`));
