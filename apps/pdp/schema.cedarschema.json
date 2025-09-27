@@ -1,0 +1,68 @@
+{
+  "namespace": "ai",
+  "entityTypes": {
+    "User": {
+      "shape": {
+        "type": "Record",
+        "attributes": {
+          "orgId": { "type": "String" },
+          "roles": { "type": { "Set": "String" } }
+        }
+      }
+    },
+    "Agent": {
+      "shape": {
+        "type": "Record",
+        "attributes": {
+          "orgId": { "type": "String" },
+          "name": { "type": "String" }
+        }
+      }
+    },
+    "Room": {
+      "shape": {
+        "type": "Record",
+        "attributes": {
+          "orgId": { "type": "String" },
+          "members": { "type": { "Set": { "Entity": { "type": "User" } } } },
+          "teacherPresent": { "type": "Bool" }
+        }
+      }
+    },
+    "Thread": {
+      "shape": {
+        "type": "Record",
+        "attributes": {
+          "roomId": { "type": "String" },
+          "visibility": { "type": "String" }
+        }
+      }
+    },
+    "Message": {
+      "shape": {
+        "type": "Record",
+        "attributes": {
+          "roomId": { "type": "String" },
+          "authorId": { "type": "String" }
+        }
+      }
+    },
+    "File": {
+      "shape": {
+        "type": "Record",
+        "attributes": {
+          "roomId": { "type": "String" },
+          "classification": { "type": "String" }
+        }
+      }
+    }
+  },
+  "actions": {
+    "CreateThread": { "appliesTo": { "principalTypes": ["User", "Agent"], "resourceTypes": ["Room"] } },
+    "Invite": { "appliesTo": { "principalTypes": ["User"], "resourceTypes": ["Room"] } },
+    "Summarize": { "appliesTo": { "principalTypes": ["User", "Agent"], "resourceTypes": ["Room"] } },
+    "LabelMessage": { "appliesTo": { "principalTypes": ["User", "Agent"], "resourceTypes": ["Message"] } },
+    "AnalyzeFile": { "appliesTo": { "principalTypes": ["User", "Agent"], "resourceTypes": ["File"] } },
+    "PostAsAgent": { "appliesTo": { "principalTypes": ["Agent"], "resourceTypes": ["Room"] } }
+  }
+}
