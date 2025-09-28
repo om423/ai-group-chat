@@ -5,6 +5,7 @@ import { postAsAgentImpl } from "../tools/postAsAgent";
 import { ChatState } from "../state/chat";
 import { ioEmit } from "../ws/emit";
 import { AgentFlags, AgentConfig } from "../state/agents";
+import { noteUserMessage, shouldTriggerSummary, markSummary, getRollingConfig } from "../observe/rolling_summary";
 
 // Policy-gated executors
 const execSumm = executeWithPolicy(
@@ -19,12 +20,7 @@ const execPost = executeWithPolicy(
 );
 
 // Configuration
-const MSG_THRESHOLD = Number(process.env.SUMMARIZER_THRESHOLD || 25);
-const ROLLING_COOLDOWN = Number(process.env.SUMMARIZER_COOLDOWN_MS || 60000);
 const WINDOW_SIZE = Number(process.env.SUMMARIZER_WINDOW || 40);
-
-// Track last recap times per room
-let lastRecap: Record<string, number> = {};
 
 export function startSummarizer() {
   if (!AgentFlags.summarizer) {
@@ -32,21 +28,20 @@ export function startSummarizer() {
     return;
   }
 
-  console.log("Starting SummarizerAgent with threshold:", MSG_THRESHOLD, "cooldown:", ROLLING_COOLDOWN);
+  const config = getRollingConfig();
+  console.log("Starting SummarizerAgent with interval:", config.interval, "cooldown:", config.minMs);
 
   // Rolling summaries - trigger when message count exceeds threshold
   on("message.created", async (m: any) => {
     if (m.authorType !== "User") return;
     
-    const recentCount = ChatState.countSinceLastSummary(m.roomId);
-    const now = Date.now();
+    // Count user messages and check if we should trigger a summary
+    noteUserMessage(m.roomId);
     
-    // Check if we should trigger a rolling summary
-    if (recentCount > MSG_THRESHOLD && (now - (lastRecap[m.roomId] || 0) > ROLLING_COOLDOWN)) {
-      console.log(`SummarizerAgent: Triggering rolling summary for room ${m.roomId} (${recentCount} messages since last summary)`);
+    if (shouldTriggerSummary(m.roomId)) {
+      console.log(`SummarizerAgent: Triggering rolling summary for room ${m.roomId} (${config.interval} user messages since last summary)`);
       await doSummary(m.roomId, "rolling");
-      lastRecap[m.roomId] = now;
-      ChatState.markSummary(m.roomId);
+      markSummary(m.roomId);
     }
   });
 
@@ -164,6 +159,5 @@ export async function triggerSummary(roomId: string, type: "welcome" | "rolling"
   }
   
   await doSummary(roomId, type);
-  lastRecap[roomId] = Date.now();
-  ChatState.markSummary(roomId);
+  markSummary(roomId);
 }

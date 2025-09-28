@@ -37,11 +37,21 @@ If uncertain, say what's missing and propose a next step.`;
 
 export function startFacilitator() {
   on("message.created", async (m: MessageCreatedEvent) => {
-    if (!AgentFlags.facilitator) return;
-    if (m.authorType !== "User") return;
+    console.log(`[Facilitator] Message received: ${m.text} from ${m.authorType}`);
+    if (!AgentFlags.facilitator) {
+      console.log("[Facilitator] Disabled by flag");
+      return;
+    }
+    if (m.authorType !== "User") {
+      console.log("[Facilitator] Not a user message, skipping");
+      return;
+    }
 
     const now = Date.now();
-    if (now - ChatState.lastAIPost(m.roomId) < COOLDOWN_MS) return;
+    if (now - ChatState.lastAIPost(m.roomId) < COOLDOWN_MS) {
+      console.log("[Facilitator] In cooldown period, skipping");
+      return;
+    }
 
     // Get recent messages from MongoDB
     const recentMessages = await MessageModel.find({ roomId: m.roomId })
@@ -74,7 +84,12 @@ export function startFacilitator() {
       reason = "llm";
     }
 
-    if (!speak) return;
+    if (!speak) {
+      console.log("[Facilitator] Decided not to speak");
+      return;
+    }
+    
+    console.log(`[Facilitator] Will speak, reason: ${reason}`);
 
     // Choose action
     const decision: Decision = chooseAction(m.text, recent.length);

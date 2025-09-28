@@ -12,8 +12,23 @@ export const validatePostAsAgent = (b: unknown) => schema.parse(b);
 import { ioEmit } from "../ws/emit";
 
 const impl = async ({ roomId, text }: PostInput) => {
+  // Store agent message in database
+  const { MessageModel } = await import("../db/models");
+  const msg = await MessageModel.create({
+    roomId,
+    authorType: "Agent",
+    authorId: "FacilitatorAgent",
+    text,
+    ts: Date.now()
+  });
+  
+  // Emit to socket for real-time updates
   ioEmit("agent:message", { roomId, text, ts: Date.now() });
-  return { posted: true };
+  
+  // Also emit as regular chat message
+  ioEmit("chat:message", msg.toObject());
+  
+  return { posted: true, message: msg };
 };
 
 export const execPostAsAgent = executeWithPolicy<PostInput, Awaited<ReturnType<typeof impl>>>(

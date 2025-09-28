@@ -20,11 +20,11 @@ function principalHeaders(role: "Teacher" | "Student" | "Analyst" | "Researcher"
   };
 }
 
-export const createThread = async ({ roomId, visibility, as }: { roomId: string; visibility: "public" | "private"; as: string }) => {
+export const createThread = async ({ roomId, visibility, as, metadata }: { roomId: string; visibility: "public" | "private"; as: string; metadata?: Partial<{ name: string; originMessageId: string; originAuthorId: string; originAuthorType: "User" | "Agent"; originSnippet: string; }> }) => {
   const res = await fetch(`${AGENT_BASE}/tools/create-thread`, {
     method: "POST",
     headers: { "content-type": "application/json", ...principalHeaders(as as any) },
-    body: JSON.stringify({ roomId, visibility })
+    body: JSON.stringify({ roomId, visibility, ...(metadata ?? {}) })
   });
   const data = await res.json();
   if (!res.ok || !data.ok) throw new Error(data.error || "Denied");

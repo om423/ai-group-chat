@@ -11,7 +11,75 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        border: "hsl(var(--border))",
+        sage: {
+          50: '#F6FAF6',
+          100: '#EDF5EE',
+          200: '#DCEAD9',
+          300: '#C6D9C4',
+          400: '#A9C3A8',
+          500: '#8BAA8C',
+          600: '#6F8F71',
+          700: '#5C775E',
+          800: '#495F4B',
+          900: '#374A39'
+        },
+        matcha: {
+          50: '#F6FAF6',
+          100: '#EDF5EE',
+          200: '#DCEAD9',
+          300: '#CDE3CE',
+          400: '#A8C3A0',
+          500: '#8BAA8C',
+          600: '#6F8F71',
+          700: '#5C775E',
+          800: '#495F4B',
+          900: '#374A39'
+        },
+        creme: {
+          50: '#FAF9F6',
+          100: '#F3F1EB',
+          200: '#E8E4D8',
+          300: '#DDD6C5',
+          400: '#D2C8B2',
+          500: '#C7BA9F',
+          600: '#B8A885',
+          700: '#A8966B',
+          800: '#988451',
+          900: '#887237'
+        },
+        sand: {
+          50: '#FBFAF7',
+          100: '#F6F3ED',
+          200: '#EEE8DA',
+          300: '#E3DAC7',
+          400: '#D5C9B2',
+          500: '#C7B89E',
+          600: '#A9987C',
+          700: '#8C7C63',
+          800: '#6F624E',
+          900: '#524A3B'
+        },
+        ink: {
+          50: '#F7F7F8',
+          100: '#EEEFF1',
+          200: '#DCDDDF',
+          300: '#C7C9CE',
+          400: '#A1A5AE',
+          500: '#6B7280',
+          600: '#4B5563',
+          700: '#374151',
+          800: '#1F2937',
+          900: '#111827'
+        },
+        accent: '#8BAA8C',
+        bg: '#F6FAF6',
+        card: '#FFFFFF',
+        border: '#E7EAE9',
+        success: '#6F8F71',
+        warning: '#D6A85C',
+        danger: '#B85C5C',
+        // Keep existing CSS variable colors for compatibility
+        'border-var': "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
@@ -32,7 +100,7 @@ module.exports = {
           DEFAULT: "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",
         },
-        accent: {
+        'accent-var': {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
         },
@@ -40,7 +108,7 @@ module.exports = {
           DEFAULT: "hsl(var(--popover))",
           foreground: "hsl(var(--popover-foreground))",
         },
-        card: {
+        'card-var': {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
@@ -56,15 +124,21 @@ module.exports = {
         },
       },
       borderRadius: {
+        xl: '1.25rem',
+        '2xl': '1.5rem',
+        pill: '9999px',
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ["ui-sans-serif", "system-ui", "sans-serif"],
+        sans: ['var(--font-inter)', 'ui-sans-serif', 'system-ui'],
         mono: ["ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "Liberation Mono", "Courier New", "monospace"],
       },
       fontSize: {
+        display: ['56px', { lineHeight: '1.05', letterSpacing: '-0.02em' }],
+        hero: ['40px', { lineHeight: '1.1', letterSpacing: '-0.01em' }],
+        subtitle: ['18px', { lineHeight: '1.5' }],
         xs: ["0.75rem", { lineHeight: "1rem" }],
         sm: ["0.875rem", { lineHeight: "1.25rem" }],
         base: ["1rem", { lineHeight: "1.5rem" }],
@@ -80,6 +154,9 @@ module.exports = {
         medium: "var(--font-weight-medium)",
       },
       spacing: {
+        '4.5': '1.125rem',
+        '5.5': '1.375rem',
+        '18': '4.5rem',
         "0.5": "calc(var(--spacing) * 0.5)",
         "1": "calc(var(--spacing) * 1)",
         "1.5": "calc(var(--spacing) * 1.5)",
@@ -114,6 +191,10 @@ module.exports = {
           "2xl": "1400px",
         },
       },
+      boxShadow: {
+        'soft': '0 1px 2px rgba(17,24,39,.04), 0 6px 20px rgba(17,24,39,.06)',
+        'lift': '0 10px 30px rgba(17,24,39,.08)'
+      },
       animation: {
         "fade-in": "fadeIn 0.5s ease-in-out",
         "slide-in": "slideIn 0.3s ease-out",
@@ -132,7 +213,10 @@ module.exports = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/typography'),
+    require('@tailwindcss/forms')
+  ],
 }
 
 

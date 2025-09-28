@@ -22,7 +22,15 @@ export const MessageSchema = new Schema({
   authorType: { type: String, enum: ["User","Agent"] },
   authorId: String,
   text: String,
-  ts: { type: Number, index: true }
+  ts: { type: Number, index: true },
+  labels: [String],
+  meta: {
+    task: {
+      assignedTo: String,
+      done: { type: Boolean, default: false },
+      dueAt: Date
+    }
+  }
 }, { timestamps: true });
 export const MessageModel = mongoose.model("Message", MessageSchema);
 
@@ -33,6 +41,10 @@ export const ThreadSchema = new Schema({
   name:     String,
   visibility:{ type: String, enum: ["public","private"], default: "public" },
   createdBy:{ type: String },                      // userId or "facilitator"
+  originMessageId: { type: String },
+  originAuthorId: { type: String },
+  originAuthorType: { type: String },
+  originSnippet: { type: String },
 }, { timestamps: true });
 export const ThreadModel = mongoose.model("Thread", ThreadSchema);
 

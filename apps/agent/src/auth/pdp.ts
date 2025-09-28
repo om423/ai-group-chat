@@ -39,6 +39,12 @@ export async function authorize(input: PDPInput) {
   };
 }
 
+// New permissive PDP for actions
+export async function pdpDecide(input: { action: any; subject: any; resource: any }) {
+  // Log-only PDP (ALLOW with explanation). Replace with real Cedar call later.
+  return { decision: "ALLOW" as const, explanation: "Permissive mode (log-only)" };
+}
+
 // New: "executor" that receives principal per call
 export function executeWithPolicy<TArgs extends object, TRes>(
   actionName: string,

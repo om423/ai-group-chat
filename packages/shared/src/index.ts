@@ -6,7 +6,8 @@ export type AgentAction =
   | { type: "summarizeWindow"; roomId: string; k: number }
   | { type: "inviteUser"; roomId: string; userId: string }
   | { type: "labelMessage"; messageId: string; label: string }
-  | { type: "analyzeFile"; s3Key: string };
+  | { type: "analyzeFile"; s3Key: string }
+  | { type: "welcomeBrief"; roomId: string; userId: string; kMessages?: number };
 
 export const ACTION = {
   CreateThread: "CreateThread",

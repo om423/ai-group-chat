@@ -8,7 +8,7 @@ import http from "node:http";
 import { Server as IOServer } from "socket.io";
 
 import { connectMongo } from "./db/mongo";
-import { MessageModel, RoomModel } from "./db/models";
+import { MessageModel, RoomModel, ThreadModel, ThreadMessageModel } from "./db/models";
 
 // Connect to MongoDB
 connectMongo().then(() => console.log("[agent] Mongo connected"));
@@ -27,15 +27,23 @@ import { Rooms } from "./state/rooms";
 import { AgentMessages } from "./state/messages";
 import { ChatState, ChatMsg } from "./state/chat";
 import { startFacilitator } from "./agents/facilitator";
+import { startFacilitatorMastra } from "./agents/facilitator_mastra";
 import { startDocAnalyst } from "./agents/docAnalyst";
+import { startDocAnalystMastra } from "./agents/docAnalyst_mastra";
 import { startSummarizer } from "./agents/summarizer";
+import { startSummarizerMastra } from "./agents/summarizer_mastra";
 import { emit } from "./bus/events";
+import { registerActionHandlers } from "./socket/actions";
+import { mastra } from "./mastra";
 
 const PORT = 4111;
 const app = express();
 const server = http.createServer(app);
 const io = new IOServer(server, { cors: { origin: "*" } });
 setIO(io);
+
+// Register action handlers
+registerActionHandlers(io);
 
 app.use(cors({ origin: "*" }));
 app.use(express.json());
@@ -45,6 +53,12 @@ if (!fs.existsSync(path.join(process.cwd(), "uploads"))) fs.mkdirSync(path.join(
 
 io.on("connection", (socket) => {
   console.log("[agent] socket client connected", socket.id);
+  
+  // Join socket to rooms
+  socket.on("room:join", (roomId: string) => {
+    socket.join(roomId);
+    console.log(`[agent] socket ${socket.id} joined room ${roomId}`);
+  });
 });
 
 // Health & traces
@@ -116,7 +130,15 @@ async function runTool({
 
 // ---- Tools (policy-gated) ----
 app.post("/tools/create-thread", async (req, res) => {
-  const body = validateCreateThread(req.body);
+  const principal = getPrincipalFromReq(req);
+  const augmented = {
+    ...req.body,
+    createdBy:
+      principal.type === "User"
+        ? principal.id
+        : principal.name || principal.id || "facilitator",
+  };
+  const body = validateCreateThread(augmented);
   const out = await runTool({
     req,
     input: body,
@@ -126,10 +148,7 @@ app.post("/tools/create-thread", async (req, res) => {
       return { type: "Room", id: body.roomId, orgId: rc.orgId, teacherPresent: rc.teacherPresent };
     },
     context: { visibility: body.visibility },
-    exec: async () => {
-      const principal = getPrincipalFromReq(req);
-      return execCreateThread(principal, createThreadImpl, body);
-    }
+    exec: async () => execCreateThread(principal, createThreadImpl, body)
   });
   res.status(out.ok ? 200 : 403).json(out);
 });
@@ -272,11 +291,85 @@ app.post("/chat/send", async (req, res) => {
 
   io.emit("chat:message", msg.toObject());
 
+  // Trigger agent responses for user messages
   if (principal.type === "User") {
-    maybeRespondToUserMessage({ roomId, authorId: principal.id!, text });
+    // Emit event to trigger agent processing
+    emit("message.created", { 
+      roomId, 
+      authorType: "User",
+      authorId: principal.id!, 
+      text, 
+      ts: Date.now() 
+    });
   }
 
   res.json({ ok: true, message: msg });
+});
+
+// ---- Thread Endpoints ----
+app.get("/rooms/:roomId/threads", async (req, res) => {
+  try {
+    const rows = await ThreadModel.find({ roomId: req.params.roomId }).sort({ updatedAt: -1 });
+    res.json({
+      ok: true,
+      threads: rows.map((row) => ({
+        threadId: row.threadId,
+        roomId: row.roomId,
+        name: row.name,
+        visibility: row.visibility,
+        createdBy: row.createdBy,
+        originMessageId: row.originMessageId,
+        originAuthorId: row.originAuthorId,
+        originAuthorType: row.originAuthorType,
+        originSnippet: row.originSnippet,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+      })),
+    });
+  } catch (error: any) {
+    res.status(500).json({ ok: false, error: error?.message || "Failed to load threads" });
+  }
+});
+
+app.get("/threads/:threadId/history", async (req, res) => {
+  try {
+    const limit = parseInt(String(req.query.limit ?? "50"), 10);
+    const rows = await ThreadMessageModel.find({ threadId: req.params.threadId })
+      .sort({ ts: 1 })
+      .limit(limit);
+    res.json({ ok: true, messages: rows });
+  } catch (error: any) {
+    res.status(500).json({ ok: false, error: error?.message || "Failed to load thread history" });
+  }
+});
+
+app.post("/threads/:threadId/send", async (req, res) => {
+  try {
+    const { text = "" } = req.body || {};
+    const thread = await ThreadModel.findOne({ threadId: req.params.threadId });
+    if (!thread) {
+      return res.status(404).json({ ok: false, error: "Thread not found" });
+    }
+
+    const principal = getPrincipalFromReq(req);
+    const authorType = principal.type;
+    const authorId = principal.type === "User" ? principal.id : principal.name || principal.id || "Agent";
+
+    const msg = await ThreadMessageModel.create({
+      threadId: req.params.threadId,
+      roomId: thread.roomId,
+      authorType,
+      authorId,
+      text: String(text),
+      ts: Date.now(),
+    });
+
+    io.emit("thread:message", msg.toObject());
+
+    res.json({ ok: true, message: msg });
+  } catch (error: any) {
+    res.status(500).json({ ok: false, error: error?.message || "Failed to send thread message" });
+  }
 });
 
 // Last N messages for a room
@@ -331,8 +424,22 @@ app.post("/summarize/:roomId", async (req, res) => {
 });
 
 // Start the agents
-startFacilitator();
-startDocAnalyst();
-startSummarizer();
+// Start Mastra-based agents (new implementation)
+startFacilitatorMastra();
+startDocAnalystMastra();
+startSummarizerMastra();
+
+// Keep original agents as fallback (commented out for now)
+// startFacilitator();
+// startDocAnalyst();
+// startSummarizer();
+
+// Initialize Mastra server
+try {
+  // Mastra server is already integrated with Express, no need to start separately
+  console.log('[mastra] Mastra configuration loaded successfully');
+} catch (error) {
+  console.error('[mastra] Failed to load Mastra configuration:', error);
+}
 
 server.listen(PORT, () => console.log(`[agent] listening on :${PORT}`));

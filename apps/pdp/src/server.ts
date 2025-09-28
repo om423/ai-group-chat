@@ -10,9 +10,7 @@ app.use(express.json());
 
 function getDenyReason(principal: any, action: string, resource: any, context: any): string {
   if (action === "CreateThread") {
-    if (principal.type === "User" && principal.roles?.includes("Student") && context.visibility === "public") {
-      return "Students cannot create public threads";
-    } else if (principal.type === "User" && !principal.roles?.includes("Teacher") && !principal.roles?.includes("Student")) {
+    if (principal.type === "User" && !principal.roles?.includes("Teacher") && !principal.roles?.includes("Student")) {
       return "Only Teachers and Students can create threads";
     } else if (principal.type === "Agent" && (!resource.teacherPresent || context.visibility !== "public")) {
       return "Agents can only create public threads when teacher is present";
@@ -60,8 +58,8 @@ app.post("/authorize", async (req, res) => {
         decision = "Allow"; // Agent can create public threads when teacher is present
       } else if (principal.type === "User" && principal.roles?.includes("Teacher")) {
         decision = "Allow"; // Teachers can create threads
-      } else if (principal.type === "User" && principal.roles?.includes("Student") && context.visibility === "private") {
-        decision = "Allow"; // Students can create private threads
+      } else if (principal.type === "User" && principal.roles?.includes("Student")) {
+        decision = "Allow"; // Students can create both private and public threads
       }
     } else if (action === "Summarize") {
       if (principal.type === "Agent" || principal.roles?.includes("Teacher") || principal.roles?.includes("Analyst")) {

@@ -5,15 +5,20 @@ import { io, Socket } from "socket.io-client";
 import { createThread, summarizeWindow, uploadFile, analyzeFile, labelMessage } from "@/agentic/actions";
 import { setTeacherPresent, resetTraces, resetMessages, fetchRooms, fetchHistory } from "@/lib/api";
 import { sendChatMessage } from "@/lib/chat";
-import { listThreads, createThread as createThreadHelper, fetchThreadHistory, sendThreadMessage } from "@/lib/threads";
+import { listThreads, createThread as createThreadHelper, fetchThreadHistory, sendThreadMessage, ThreadMetadata } from "@/lib/threads";
+import { runAgenticAction, runMastraAction } from "@/cedar/actionAdapter";
 import LoginForm from "@/components/LoginForm";
+import HomePage from "@/components/HomePage";
 import { labelMessage as labelMessageAction } from "@/agentic/actions";
-import { createThread as spellCreateThread } from "@/agentic/actions";
 import { ChatShell } from "@/layouts/ChatShell";
 import { ThreadsPanel, Thread } from "@/components/threads/ThreadsPanel";
 import { MessageList, ChatMsg } from "@/components/chat/MessageList";
 import { Composer } from "@/components/chat/Composer";
 import { RightPanel } from "@/components/right/RightPanel";
+import { RadialMessageMenu } from "@/components/spells/RadialMessageMenu";
+import { SpellsMenu } from "@/components/spells/SpellsMenu";
+import { SelectionTooltip } from "@/components/spells/SelectionTooltip";
+import { QuestioningMode } from "@/components/spells/QuestioningMode";
 
 const AGENT_BASE = process.env.NEXT_PUBLIC_MASTRA_BASE_URL || "http://localhost:4111";
 
@@ -52,6 +57,7 @@ export default function Page() {
   const [asRole, setAsRole] = useState("Student");
   const [log, setLog] = useState<string[]>([]);
   const [showDemo, setShowDemo] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
 
   const [fileId, setFileId] = useState<string | null>(null);
   const [classification, setClassification] = useState("internal");
@@ -67,10 +73,31 @@ export default function Page() {
   const [activeThread, setActiveThread] = useState<Thread | null>(null);
   const [threadChat, setThreadChat] = useState<any[]>([]);
   const [threadInput, setThreadInput] = useState("");
+  const [currentSummary, setCurrentSummary] = useState<string>("");
+  const [welcomeBrief, setWelcomeBrief] = useState<string>("");
 
   const [labelsByMessage, setLabelsByMessage] = useState<Record<string, { label:string; classification:string }>>({});
   const [socketConnected, setSocketConnected] = useState(false);
   const [lastRTT, setLastRTT] = useState<number | null>(null);
+  const [radialTarget, setRadialTarget] = useState<{ messageId: string; text: string; authorId?: string; authorType?: string } | null>(null);
+
+  // Listen for radial menu events and update target
+  useEffect(() => {
+    const handleRadialOpen = (e: any) => {
+      const detail = e.detail as { x: number; y: number; messageId: string; text: string; authorId?: string; authorType?: string };
+      if (detail) {
+        setRadialTarget({
+          messageId: detail.messageId,
+          text: detail.text,
+          authorId: detail.authorId,
+          authorType: detail.authorType
+        });
+      }
+    };
+    
+    window.addEventListener("spell:messageRadialOpen", handleRadialOpen);
+    return () => window.removeEventListener("spell:messageRadialOpen", handleRadialOpen);
+  }, []);
 
   const socketRef = useRef<Socket | null>(null);
   const seenIdsRef = useRef<Set<string>>(new Set());
@@ -104,6 +131,16 @@ export default function Page() {
 
     socket.on("agent:message:reset", () => setAgentMsgs([]));
     socket.on("agent:trace", (t: any) => setTraces(prev => [t, ...prev].slice(0, 200)));
+    
+    // Action result handler for summaries and welcome briefs
+    socket.on("action:result", (res: any) => {
+      if (res.ok && res.action?.type === "summarizeWindow" && res.data?.summary) {
+        setCurrentSummary(res.data.summary);
+      }
+      if (res.ok && res.action?.type === "welcomeBrief" && res.data?.brief) {
+        setWelcomeBrief(res.data.brief);
+      }
+    });
 
     // Thread events
     socket.on("thread:created", (t: any) => {
@@ -152,8 +189,35 @@ export default function Page() {
       listThreads(roomId).then(setThreads).catch(()=>{});
       setActiveThread(null);
       setThreadChat([]);
+
+      // Trigger welcome brief on room open
+      const userId = `u-${asRole.toLowerCase()}`; // Use the current role as user ID
+      const kMessages = Number(process.env.NEXT_PUBLIC_WELCOME_BRIEF_K ?? 40);
+      
+      // Try Mastra first, fallback to agentic action
+      const triggerWelcomeBrief = async () => {
+        try {
+          await runMastraAction({ 
+            type: "welcomeBrief", 
+            roomId, 
+            userId, 
+            prompt: `Generate a welcome brief for room ${roomId} with the last ${kMessages} messages`,
+            kMessages 
+          });
+        } catch (error) {
+          console.log('[Mastra] Welcome brief failed, falling back to agentic action:', error);
+          runAgenticAction({ 
+            type: "welcomeBrief", 
+            roomId, 
+            userId, 
+            kMessages 
+          });
+        }
+      };
+      
+      triggerWelcomeBrief();
     }
-  }, [roomId]);
+  }, [roomId, asRole]);
 
   async function runCreate() {
     try {
@@ -250,6 +314,15 @@ export default function Page() {
     setAsRole(loginData.role);
   };
 
+  const handleEnterChat = () => {
+    // Show the login form when user clicks "Enter Chat" or "Get Started"
+    setShowLogin(true);
+  };
+
+  const handleShowLogin = () => {
+    setShowLogin(true);
+  };
+
   const handleLogout = () => {
     setRoomId(null);
   };
@@ -261,11 +334,62 @@ export default function Page() {
     setThreadChat(hist);
   }
 
+  async function registerThread(result: {
+    threadId: string;
+    roomId?: string;
+    name?: string;
+    visibility?: "public" | "private";
+    createdBy?: string;
+    originMessageId?: string;
+    originAuthorId?: string;
+    originAuthorType?: string;
+    originSnippet?: string;
+  }) {
+    const normalized: Thread = {
+      threadId: result.threadId,
+      roomId: result.roomId ?? roomId!,
+      name: result.name || result.threadId,
+      visibility: (result.visibility as Thread["visibility"]) || "public",
+      createdBy: result.createdBy,
+      originMessageId: result.originMessageId,
+      originAuthorId: result.originAuthorId,
+      originAuthorType: result.originAuthorType,
+      originSnippet: result.originSnippet,
+    };
+
+    setThreads(prev => {
+      const without = prev.filter(t => t.threadId !== normalized.threadId);
+      return [normalized, ...without];
+    });
+
+    await openThread(normalized);
+    return normalized;
+  }
+
+  async function createThreadAndOpen(visibility: "public" | "private", metadata: ThreadMetadata = {}) {
+    if (!roomId) throw new Error("No active room");
+    const created = await createThreadHelper(roomId, visibility, asRole, metadata);
+    const thread = await registerThread({
+      threadId: created.threadId,
+      roomId: created.roomId,
+      name: created.name,
+      visibility: created.visibility,
+      createdBy: created.createdBy,
+      originMessageId: created.originMessageId,
+      originAuthorId: created.originAuthorId,
+      originAuthorType: created.originAuthorType,
+      originSnippet: created.originSnippet,
+    });
+    setLog(l => [`THREAD ${visibility} → ${thread.threadId}`, ...l]);
+    return thread;
+  }
+
   async function onCreateThread(visibility: "public"|"private") {
-    const t = await createThreadHelper(roomId!, visibility, asRole);
-    // Prefer to open it immediately:
-    setThreads(prev => [{ threadId:t.threadId, roomId: roomId!, name:t.name || t.threadId, visibility: visibility }, ...prev]);
-    openThread({ threadId:t.threadId, roomId: roomId!, name:t.name || t.threadId, visibility });
+    try {
+      await createThreadAndOpen(visibility);
+    } catch (error: any) {
+      setLog(l => [`Create thread failed → ${error?.message || error}`, ...l]);
+    }
   }
 
   async function sendToThread(e?:React.FormEvent) {
@@ -276,11 +400,79 @@ export default function Page() {
     setThreadInput("");
   }
 
-  function forkFromMessage(msgId: string) {
-    // simple: create thread and pre-fill with a quoted first message
-    onCreateThread("public").then(()=> {
-      if (activeThread) sendThreadMessage(activeThread.threadId, `→ forked from message ${msgId}`, asRole);
-    });
+  async function handleForkFromMessage(source: ChatMsg | { messageId: string; text: string; authorId?: string; authorType?: string }) {
+    if (!roomId) return;
+
+    try {
+      let messageId: string | undefined;
+      let fallbackText = "";
+      let fallbackAuthorId: string | undefined;
+      let fallbackAuthorType: string | undefined;
+
+      if ("messageId" in source) {
+        messageId = source.messageId;
+        fallbackText = source.text ?? "";
+        fallbackAuthorId = source.authorId;
+        fallbackAuthorType = source.authorType;
+      } else {
+        messageId = source._id || source.id;
+        fallbackText = source.text ?? "";
+        fallbackAuthorId = source.authorId;
+        fallbackAuthorType = source.authorType;
+      }
+
+      if (!messageId) throw new Error("Unable to determine message id for fork");
+
+      const existing = chat.find(m => (m._id || m.id) === messageId);
+      const text = existing?.text ?? fallbackText;
+      const authorId = existing?.authorId ?? fallbackAuthorId ?? "Unknown";
+      const authorType = existing?.authorType ?? fallbackAuthorType ?? "User";
+      const originAuthorType = authorType === "Agent" || authorType === "User" ? authorType : undefined;
+
+      const choice = window.prompt("Fork visibility (public/private)", "public");
+      if (choice === null) return; // user cancelled
+      const visibility = choice.trim().toLowerCase().startsWith("priv") ? "private" : "public";
+
+      const snippet = text ? text.slice(0, 200) : undefined;
+      const metadata: ThreadMetadata = {
+        name: `${visibility === "private" ? "Private notes" : "Fork"} • ${authorId}`,
+        originMessageId: messageId,
+        originAuthorId: authorId,
+        originAuthorType,
+        originSnippet: snippet,
+      };
+
+      const newThread = await createThreadAndOpen(visibility, metadata);
+
+      const shortId = messageId ? messageId.slice(-6) : "";
+      const intro = visibility === "private"
+        ? `Private fork created from message ${shortId || "(unknown)"} by ${authorId}.`
+        : `Forked discussion for message ${shortId || "(unknown)"} by ${authorId}.`;
+      const quoted = text
+        ? text.split(/\r?\n/).map(line => `> ${line}`).join("\n")
+        : "(original message unavailable)";
+
+      await sendThreadMessage(newThread.threadId, `${intro}\n\n${quoted}`, asRole);
+
+      if (visibility === "private") {
+        const shouldAsk = window.confirm("Ask the AI for help in this private fork now?");
+        if (shouldAsk) {
+          await sendThreadMessage(
+            newThread.threadId,
+            `/ai I need help understanding message ${shortId || messageId}: ${text}`,
+            asRole
+          );
+        }
+      }
+
+      setLog(l => [`Forked ${visibility} thread ${newThread.threadId} from ${messageId}`, ...l]);
+      setRadialTarget(null);
+    } catch (error: any) {
+      console.error("Fork failed", error);
+      setLog(l => [`Fork failed → ${error?.message || error}`, ...l]);
+      setRadialTarget(null);
+      window.alert(`Unable to fork message: ${error?.message || error}`);
+    }
   }
 
   // Action handlers
@@ -298,88 +490,108 @@ export default function Page() {
     }
   }
 
-  async function handleForkFromMessage(msgId: string) {
-    try {
-      const t = await spellCreateThread({ roomId: roomId!, visibility: "public", as: asRole });
-      setLog(l => [`Forked thread ${t.threadId} from message ${msgId}`, ...l]);
-      // Optionally open the new thread immediately:
-      const newT = { threadId: t.threadId, roomId: roomId!, name: t.name || t.threadId, visibility: "public" as const };
-      setThreads(prev => [newT, ...prev]);
-      openThread(newT);
-    } catch (e:any) {
-      setLog(l => [`Fork failed → ${e.message}`, ...l]);
-    }
-  }
-
   if (roomId) {
     return (
-      <ChatShell 
-        roomId={roomId}
-        left={
-          <ThreadsPanel
-            rooms={rooms}
-            currentRoomId={roomId}
-            onRoomSelect={setRoomId}
-            threads={threads}
-            activeThread={activeThread}
-            onThreadSelect={openThread}
-            onCreateThread={onCreateThread}
-          />
-        }
-        center={
-          <div className="flex flex-col h-full">
-            {/* Chat Messages */}
-            <div className="flex-1 overflow-hidden">
-              <MessageList
-                messages={chat}
-                labelsByMessage={labelsByMessage}
-                onForkFromMessage={handleForkFromMessage}
-                onLabel={handleLabel}
-                onCopyId={handleCopyId}
-              />
+      <>
+        <ChatShell 
+          roomId={roomId}
+          left={
+            <ThreadsPanel
+              rooms={rooms}
+              currentRoomId={roomId}
+              onRoomSelect={setRoomId}
+              threads={threads}
+              activeThread={activeThread}
+              onThreadSelect={openThread}
+              onCreateThread={onCreateThread}
+            />
+          }
+          center={
+            <div className="flex flex-col h-full">
+              {/* Chat Messages */}
+              <div className="flex-1 overflow-hidden">
+                <div className="h-full rounded-3xl border border-border/60 bg-card/60 shadow-soft">
+                  <MessageList
+                    messages={chat}
+                    labelsByMessage={labelsByMessage}
+                    onForkFromMessage={handleForkFromMessage}
+                    onLabel={handleLabel}
+                    onCopyId={handleCopyId}
+                  />
+                </div>
+              </div>
+              
+              {/* Composer */}
+              <div className="mt-4">
+                <div className="rounded-3xl border border-border/60 shadow-soft bg-card/70">
+                  <Composer
+                    value={input}
+                    onChange={setInput}
+                    onSubmit={onSend}
+                    onAttach={onUploadChange}
+                    disabled={sendingRef.current}
+                  />
+                </div>
+              </div>
             </div>
-            
-            {/* Composer */}
-            <div className="border-t border-border bg-card/60 p-3">
-              <Composer
-                value={input}
-                onChange={setInput}
-                onSubmit={onSend}
-                onAttach={onUploadChange}
-                disabled={sendingRef.current}
-              />
-            </div>
-          </div>
-        }
-        right={
-          <RightPanel
-            socketConnected={socketConnected}
-            lastRTT={lastRTT}
-            roomId={roomId}
-            asRole={asRole}
-            onRoleChange={setAsRole}
-            onRoomChange={setRoomId}
-            showDemo={showDemo}
-            visibility={visibility}
-            onVisibilityChange={setVisibility}
-            k={k}
-            onKChange={setK}
-            classification={classification}
-            onClassificationChange={setClassification}
-            fileId={fileId}
-            onUploadChange={onUploadChange}
-            onAnalyze={runAnalyze}
-            onLabelInternal={runLabelInternal}
-            onLabelRestricted={runLabelRestricted}
-            onCreateThread={runCreate}
-            onSummarize={runSummarize}
-            onSendWelcomeBrief={sendWelcomeBrief}
-            traces={traces}
-          />
-        }
-      />
+          }
+          right={
+            <RightPanel
+              socketConnected={socketConnected}
+              lastRTT={lastRTT}
+              roomId={roomId}
+              asRole={asRole}
+              onRoleChange={setAsRole}
+              onRoomChange={setRoomId}
+              showDemo={showDemo}
+              visibility={visibility}
+              onVisibilityChange={setVisibility}
+              k={k}
+              onKChange={setK}
+              classification={classification}
+              onClassificationChange={setClassification}
+              fileId={fileId}
+              onUploadChange={onUploadChange}
+              onAnalyze={runAnalyze}
+              onLabelInternal={runLabelInternal}
+              onLabelRestricted={runLabelRestricted}
+              onCreateThread={runCreate}
+              onSummarize={runSummarize}
+              onSendWelcomeBrief={sendWelcomeBrief}
+              traces={traces}
+              currentSummary={currentSummary}
+              welcomeBrief={welcomeBrief}
+            />
+          }
+        />
+        
+        {/* Cedar Spells Components */}
+        <RadialMessageMenu roomId={roomId} target={radialTarget} onFork={handleForkFromMessage} />
+        <SpellsMenu roomId={roomId} />
+        <SelectionTooltip roomId={roomId} />
+        <QuestioningMode />
+      </>
     );
   }
 
-  return <LoginForm onLogin={handleLogin} />;
+  return (
+    <div>
+      <HomePage onEnterChat={handleEnterChat} onShowLogin={handleShowLogin} />
+      {showLogin && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl">
+            <LoginForm onLogin={handleLogin} />
+            <button 
+              className="absolute top-4 right-4 text-ink-400 hover:text-ink-600"
+              onClick={() => setShowLogin(false)}
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

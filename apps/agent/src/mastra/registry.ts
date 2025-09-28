@@ -1,10 +1,12 @@
-// import { Agent } from "@mastra/core";
+import { facilitatorAgent, summarizerAgent, docAnalystAgent } from "./agents";
 
-// You can later inject tools or route events to agents here.
-// For now, we keep a registry for future growth (Facilitator, Moderator, etc.)
-// TODO: Fix Mastra Agent configuration when we add LLM integration
-// export const FacilitatorAgent = new Agent({
-//   name: "FacilitatorAgent",
-//   instructions:
-//     "You are a facilitator. Suggest forks and summaries. Use tools only when necessary (policy-gated).",
-// });
+// Mastra Agent Registry
+// All agents are now properly configured with Mastra
+export const agents = {
+  facilitator: facilitatorAgent,
+  summarizer: summarizerAgent,
+  docAnalyst: docAnalystAgent,
+};
+
+// Export individual agents for direct access
+export { facilitatorAgent, summarizerAgent, docAnalystAgent };

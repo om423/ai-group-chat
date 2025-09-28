@@ -13,7 +13,9 @@ export const generalHelper = new Agent({
 - Analyze code for issues and provide suggestions
 
 Always be helpful and provide detailed responses. When using tools, explain what you're doing and what the results mean.`,
-  model: openai("gpt-4o-mini"),
+  model: openai("gpt-4o-mini", {
+    apiKey: process.env.OPENAI_API_KEY || "sk-test-key",
+  }),
   tools: {
     weatherInfo,
     fileSearch,
@@ -31,7 +33,9 @@ export const mcpAgent = new Agent({
 - Help users with file operations and system tasks
 
 Always explain what tools you're using and provide clear feedback about the results.`,
-  model: openai("gpt-4o-mini"),
+  model: openai("gpt-4o-mini", {
+    apiKey: process.env.OPENAI_API_KEY || "sk-test-key",
+  }),
   tools: async () => {
     // Tools resolve when needed, not during initialization
     return await mcp.getTools();
@@ -49,7 +53,9 @@ export const codingAssistant = new Agent({
 - Debugging assistance
 
 When analyzing code, provide specific, actionable feedback. Focus on readability, performance, and maintainability.`,
-  model: openai("gpt-4o-mini"),
+  model: openai("gpt-4o-mini", {
+    apiKey: process.env.OPENAI_API_KEY || "sk-test-key",
+  }),
   tools: {
     codeAnalysis,
     fileSearch,
@@ -66,7 +72,9 @@ export const weatherSpecialist = new Agent({
 - Weather-related advice and recommendations
 
 Always provide accurate, helpful weather information and explain any technical terms in simple language.`,
-  model: openai("gpt-4o-mini"),
+  model: openai("gpt-4o-mini", {
+    apiKey: process.env.OPENAI_API_KEY || "sk-test-key",
+  }),
   tools: {
     weatherInfo,
   },

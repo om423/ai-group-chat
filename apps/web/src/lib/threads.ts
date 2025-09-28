@@ -5,7 +5,15 @@ export async function listThreads(roomId: string) {
   const j = await r.json(); if (!j.ok) throw new Error("threads"); return j.threads;
 }
 
-export async function createThread(roomId: string, visibility: "public"|"private", asRole: string) {
+export type ThreadMetadata = {
+  name?: string;
+  originMessageId?: string;
+  originAuthorId?: string;
+  originAuthorType?: string;
+  originSnippet?: string;
+};
+
+export async function createThread(roomId: string, visibility: "public"|"private", asRole: string, metadata: ThreadMetadata = {}) {
   // Use the tool endpoint to keep policy hooks (headers matter)
   const res = await fetch(`${AGENT_BASE}/tools/create-thread`, {
     method: "POST",
@@ -15,7 +23,7 @@ export async function createThread(roomId: string, visibility: "public"|"private
         ? { "x-principal-type":"Agent","x-agent-id":"facilitator","x-agent-name":"FacilitatorAgent","x-org-id":"org-1" }
         : { "x-principal-type":"User","x-user-id": `u-${asRole.toLowerCase()}`, "x-roles": asRole, "x-org-id":"org-1" })
     },
-    body: JSON.stringify({ roomId, visibility })
+    body: JSON.stringify({ roomId, visibility, ...metadata })
   });
   const j = await res.json(); if (!j.ok) throw new Error(j.error || "create-thread");
   return j.result; // { threadId, ... }

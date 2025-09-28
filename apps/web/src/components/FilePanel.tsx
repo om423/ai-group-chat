@@ -3,11 +3,11 @@ import { useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Card } from "./ui/card";
 
 const AGENT_BASE = process.env.NEXT_PUBLIC_MASTRA_BASE_URL || "http://localhost:4111";
 
-function principalHeaders(role: string) {
+function principalHeaders(role: string): Record<string, string> {
   if (role === "Agent") {
     return { "x-principal-type":"Agent","x-agent-id":"facilitator","x-agent-name":"FacilitatorAgent","x-org-id":"org-1" };
   }
@@ -56,23 +56,23 @@ export function FilePanel({ roomId, asRole }: { roomId: string; asRole: string }
       method: "POST",
       headers: { "content-type":"application/json", ...principalHeaders("Agent") },
       body: JSON.stringify({ roomId })
-    }); // reuse summarize+post endpoint; or create a dedicated /post if you prefer
+    });
     alert("Posted (see Agent Messages/Chat)");
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">File Intelligence</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Card className="rounded-2xl border-[var(--border)] bg-white shadow-soft p-5">
+      <div>
+        <h3 className="text-sm font-semibold text-ink-800">File Intelligence</h3>
+      </div>
+      <div className="space-y-5">
         <div>
-          <label className="block text-xs font-medium text-foreground mb-1">Classification</label>
+          <label className="block text-xs font-medium text-ink-800 mb-1">Classification</label>
           <Select 
             value={classification} 
             onValueChange={(value: any) => setClassification(value)}
           >
-            <SelectTrigger>
+            <SelectTrigger className="h-10 rounded-xl text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -82,42 +82,43 @@ export function FilePanel({ roomId, asRole }: { roomId: string; asRole: string }
             </SelectContent>
           </Select>
         </div>
+
         <div>
-          <label className="block text-xs font-medium text-foreground mb-1">File</label>
+          <label className="block text-xs font-medium text-ink-800 mb-1">File</label>
           <Input 
             type="file" 
             onChange={onUpload}
-            className="cursor-pointer"
+            className="cursor-pointer h-10 rounded-xl"
           />
         </div>
+
         <Button 
           onClick={runAnalyze} 
           disabled={!fileId || busy}
-          className="w-full"
+          className="w-full rounded-xl"
         >
           {busy ? "Analyzing..." : "Analyze"}
         </Button>
+
         {fileId && (
-          <div className="p-2 bg-blue-50 border border-blue-200 rounded-md text-xs text-blue-800">
-            <strong>File ID:</strong> <code className="bg-blue-100 px-1 py-0.5 rounded text-xs">{fileId}</code>
+          <div className="p-2 bg-matcha-50 border border-[var(--border)] rounded-xl text-xs text-ink-800">
+            <strong>File ID:</strong>{" "}
+            <code className="bg-matcha-100 px-1 py-0.5 rounded text-xs">{fileId}</code>
           </div>
         )}
+
         {analysis && (
-          <div className="whitespace-pre-wrap font-mono text-xs border border-border rounded-lg p-3 bg-muted text-foreground">
-            <div className="mb-2 font-semibold text-foreground">Analysis Results:</div>
+          <div className="whitespace-pre-wrap font-mono text-xs border border-[var(--border)] rounded-xl p-3 bg-creme-50 text-ink-800">
+            <div className="mb-2 font-semibold text-ink-800">Analysis Results:</div>
             {JSON.stringify(analysis, null, 2)}
             <div className="mt-3">
-              <Button 
-                size="sm"
-                onClick={postSummary}
-                className="text-xs"
-              >
+              <Button size="sm" onClick={postSummary} className="text-xs rounded-xl">
                 Post as Agent
               </Button>
             </div>
           </div>
         )}
-      </CardContent>
+      </div>
     </Card>
   );
 }

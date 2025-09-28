@@ -2,240 +2,213 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ===== CSS VARIABLES (Muted Green Theme) ===== */
-:root {
-  --font-size: 16px;
-
-  /* Core surfaces */
-  --background: #f7f8f6;          /* page background (very light warm gray) */
-  --foreground: #1f2937;          /* gray-800 */
-  --card: #ffffff;                 /* cards/panels */
-  --card-foreground: #1f2937;
-
-  /* Accents (muted green family) */
-  --primary: #86b18a;             /* primary button/focus tint */
-  --primary-foreground: #0b1114;
-  --accent: #a8c3a0;              /* chips/hover tint */
-  --accent-foreground: #1f2937;
-
-  /* Secondary/muted */
-  --secondary: #eff1ec;           /* soft panel/wash */
-  --secondary-foreground: #374151;
-  --muted: #eef0ec;               /* inputs / code blocks */
-  --muted-foreground: #6b7280;    /* gray-500 */
-
-  /* Borders/rings */
-  --border: rgba(31, 41, 55, 0.12); /* gray-800 @ 12% */
-  --ring: #86b18a;
-
-  /* Destructive */
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
-
-  /* Input bg (subtle) */
-  --input: transparent;
-  --input-background: #f1f3ef;
-
-  /* Sidebar (if used) */
-  --sidebar: #f7f7f4;
-  --sidebar-foreground: #1f2937;
-  --sidebar-primary: #86b18a;
-  --sidebar-primary-foreground: #0b1114;
-  --sidebar-accent: #eef0ec;
-  --sidebar-accent-foreground: #1f2937;
-  --sidebar-border: rgba(31, 41, 55, 0.08);
-  --sidebar-ring: #86b18a;
-
-  /* AI message swatches */
-  --ai-message-bg: #cfe6d1;  /* bot bubbles */
-  --user-message-bg: #f1f3ef;
-
-  /* Extras */
-  --hover-accent: #9dbb97;
-
-  /* Radii */
-  --radius: 0.75rem;
-}
-
-.dark {
-  --background: oklch(0.16 0 0);
-  --foreground: oklch(0.98 0 0);
-  --card: oklch(0.18 0 0);
-  --card-foreground: oklch(0.98 0 0);
-
-  --primary: oklch(0.84 0.07 148);           /* muted green in dark */
-  --primary-foreground: oklch(0.16 0 0);
-  --accent: oklch(0.82 0.06 148);
-  --accent-foreground: oklch(0.16 0 0);
-
-  --secondary: oklch(0.23 0 0);
-  --secondary-foreground: oklch(0.92 0 0);
-  --muted: oklch(0.22 0 0);
-  --muted-foreground: oklch(0.72 0 0);
-
-  --border: oklch(0.28 0 0 / 0.6);
-  --ring: oklch(0.84 0.07 148);
-
-  --destructive: oklch(0.55 0.23 28);
-  --destructive-foreground: oklch(0.16 0 0);
-
-  --sidebar: oklch(0.22 0 0);
-  --sidebar-foreground: oklch(0.96 0 0);
-  --sidebar-primary: oklch(0.84 0.07 148);
-  --sidebar-primary-foreground: oklch(0.16 0 0);
-  --sidebar-accent: oklch(0.28 0 0);
-  --sidebar-accent-foreground: oklch(0.96 0 0);
-  --sidebar-border: oklch(0.28 0 0);
-  --sidebar-ring: oklch(0.84 0.07 148);
-}
-
-/* ===== Base: fonts, smoothing, layout ===== */
+/* Crème & Matcha design tokens matched to whisper-bot-room */
 @layer base {
-  html { font-size: var(--font-size); }
-  html, body { height: 100%; }
+  :root {
+    --background: 32 12% 98%;
+    --foreground: 0 0% 18%;
+
+    --card: 30 15% 97%;
+    --card-foreground: 0 0% 18%;
+
+    --popover: 32 12% 98%;
+    --popover-foreground: 0 0% 18%;
+
+    --primary: 120 20% 65%;
+    --primary-foreground: 0 0% 18%;
+
+    --secondary: 30 15% 94%;
+    --secondary-foreground: 0 0% 18%;
+
+    --muted: 30 10% 92%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 120 30% 85%;
+    --accent-foreground: 0 0% 18%;
+
+    --destructive: 0 65% 70%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 30 15% 88%;
+    --input: 30 15% 94%;
+    --ring: 120 20% 65%;
+
+    --radius: 0.75rem;
+    --spacing: 0.25rem;
+
+    --chat-sidebar: 30 20% 96%;
+    --chat-input: 30 15% 97%;
+    --message-user: 30 15% 94%;
+    --message-agent: 120 30% 85%;
+    --message-system: 220 15% 92%;
+    --hover-user: 30 15% 90%;
+    --hover-agent: 120 30% 80%;
+    --hover-accent: 120 25% 75%;
+    --shadow-soft: 0 2px 8px -2px hsl(0 0% 0% / 0.08);
+    --shadow-message: 0 1px 3px hsl(0 0% 0% / 0.05);
+    --transition-smooth: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  html,
+  body,
+  #__next {
+    height: 100%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
   body {
-    color: var(--foreground);
-    background: var(--background);
-    font-family: var(--font-geist-sans, ui-sans-serif, system-ui, sans-serif);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    line-height: 1.5;
+    @apply bg-background text-foreground font-sans antialiased;
+    line-height: 1.6;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; border: 0 solid; }
-  a { color: inherit; text-decoration: inherit; }
-  h1,h2,h3,h4,h5,h6 { font-weight: 600; line-height: 1.2; }
-  small { font-size: 80%; }
-  code,kbd,samp,pre {
-    font-family: var(--font-geist-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+
+  h1 {
+    @apply text-hero font-semibold tracking-tight;
+  }
+
+  h2 {
+    @apply text-2xl font-semibold;
+  }
+
+  h3 {
+    @apply text-xl font-semibold;
+  }
+
+  small,
+  .text-xs {
+    @apply text-[12px] leading-4;
   }
 }
 
-/* ===== Utility classes that map to our CSS vars ===== */
-@layer utilities {
-  .bg-background { background-color: var(--background); }
-  .text-foreground { color: var(--foreground); }
-  .bg-card { background-color: var(--card); }
-  .text-card-foreground { color: var(--card-foreground); }
-  .bg-secondary { background-color: var(--secondary); }
-  .text-secondary-foreground { color: var(--secondary-foreground); }
-  .bg-muted { background-color: var(--muted); }
-  .text-muted-foreground { color: var(--muted-foreground); }
-  .bg-accent { background-color: var(--accent); }
-  .text-accent-foreground { color: var(--accent-foreground); }
-  .bg-primary { background-color: var(--primary); }
-  .text-primary-foreground { color: var(--primary-foreground); }
-  .border-border { border-color: var(--border); }
-  .ring-ring { --tw-ring-color: var(--ring); }
-  .shadow-soft { box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06); }
-  .rounded-xl { border-radius: var(--radius); }
-  .rounded-2xl { border-radius: calc(var(--radius) + 0.25rem); }
-}
-
-/* ===== Primitive components (opt-in classes for your JSX) ===== */
-
-/* Cards */
+/* Reusable shells */
 .card {
-  background: var(--card);
-  color: var(--card-foreground);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  @apply bg-card border border-border rounded-2xl shadow-soft;
 }
 
-/* Inputs */
-.input, .textarea, .select {
-  background: var(--input-background);
-  color: var(--foreground);
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 2px);
-  transition: border-color 120ms ease, box-shadow 120ms ease;
-}
-.input:focus, .textarea:focus, .select:focus {
-  outline: none;
-  border-color: var(--ring);
-  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 25%, transparent);
+.chip {
+  @apply inline-flex items-center gap-2 rounded-pill px-3 py-1.5 text-sm bg-matcha-100 text-ink-800;
 }
 
-/* Buttons (variants: .button, .button--primary, .button--ghost) */
-.button {
-  display: inline-flex; align-items: center; justify-content: center;
-  gap: .5rem; height: 2.5rem; padding: 0 .9rem;
-  border-radius: var(--radius); border: 1px solid var(--border);
-  background: var(--secondary); color: var(--secondary-foreground);
-  font-weight: 600; transition: all 160ms ease;
-}
-.button:hover { background: color-mix(in oklch, var(--secondary) 80%, white); }
-.button--primary {
-  background: var(--primary); color: var(--primary-foreground); border-color: transparent;
-}
-.button--primary:hover { filter: brightness(1.05); }
-.button--ghost {
-  background: transparent;
-}
-.button--ghost:hover {
-  background: var(--muted);
+.muted {
+  @apply text-ink-500;
 }
 
-/* Tabs (lightweight) */
-.tablist { display: flex; gap: .25rem; }
-.tab {
-  padding: .4rem .7rem; border-radius: calc(var(--radius) - 4px);
-  color: var(--muted-foreground);
-}
-.tab[aria-selected="true"] {
-  background: var(--accent);
-  color: var(--accent-foreground);
+.section-title {
+  @apply text-[11px] font-medium uppercase tracking-wider text-muted-foreground;
 }
 
-/* ===== Scrollbar ===== */
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--muted); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
+.sticky-toolbar {
+  @apply h-16 flex items-center px-5;
+}
 
-/* ===== Markdown (prose) ===== */
-.prose { color: inherit; }
-.prose h1,.prose h2,.prose h3,.prose h4,.prose h5,.prose h6 {
-  color: var(--foreground); margin-top: 0; font-weight: 600;
+/* Form + control sizing */
+input,
+textarea,
+select {
+  @apply rounded-xl border border-border bg-white outline-none;
 }
-.prose code {
-  background-color: var(--muted); padding: 0.125rem 0.25rem;
-  border-radius: calc(var(--radius) - 4px); font-size: 0.8rem;
-}
-.prose pre {
-  background-color: var(--muted); padding: 0.75rem;
-  border-radius: var(--radius); overflow-x: auto; font-size: 0.8rem;
-}
-.prose blockquote {
-  border-left: 4px solid var(--border); padding-left: 0.75rem;
-  font-style: italic; color: var(--muted-foreground);
-}
-.prose ul,.prose ol { padding-left: 1rem; }
-.prose li { margin: 0.25rem 0; }
-.prose table {
-  border-collapse: collapse; width: 100%; margin: 0.5rem 0;
-}
-.prose th,.prose td { border: 1px solid var(--border); padding: 0.5rem; text-align: left; }
-.prose th { background-color: var(--muted); font-weight: 600; }
-.prose a { color: var(--primary); text-decoration: underline; }
-.prose a:hover { color: var(--hover-accent); }
 
-/* ===== AI typing indicator ===== */
-@keyframes thinking-pulse {
-  0%,100% { opacity: 1; transform: scale(1); }
-  50% { opacity: .85; transform: scale(1.03); }
+.input {
+  @apply h-12 px-4 text-[15px] placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/40 focus:border-primary;
 }
-@keyframes thinking-bounce {
-  0%,20%,50%,80%,100% { transform: translateY(0) }
-  40% { transform: translateY(-8px) }
-  60% { transform: translateY(-4px) }
-}
-.thinking-container { animation: thinking-pulse 1.8s ease-in-out infinite; }
-.thinking-dots { animation: thinking-bounce 1.4s ease-in-out infinite; }
-.thinking-dots:nth-child(2){ animation-delay: .1s }
-.thinking-dots:nth-child(3){ animation-delay: .2s }
-.thinking-dots:nth-child(4){ animation-delay: .3s }
 
-@media (prefers-color-scheme: dark) {
-  html { color-scheme: dark; }
+.textarea {
+  @apply min-h-[96px] max-h-52 resize-none rounded-2xl border border-border px-4 py-3 focus:ring-2 focus:ring-primary/40 focus:border-primary;
+}
+
+@layer utilities {
+  .message-bubble {
+    @apply rounded-2xl px-4 py-3 shadow-sm transition-all duration-200;
+  }
+
+  .message-user {
+    @apply message-bubble bg-[hsl(var(--message-user))] hover:bg-[hsl(var(--hover-user))];
+  }
+
+  .message-agent {
+    @apply message-bubble bg-[hsl(var(--message-agent))] hover:bg-[hsl(var(--hover-agent))];
+  }
+
+  .message-system {
+    @apply message-bubble bg-[hsl(var(--message-system))] text-muted-foreground;
+  }
+
+  .chat-input {
+    @apply bg-[hsl(var(--chat-input))] border-border/50 focus:border-primary/50 focus:ring-primary/20;
+  }
+
+  .sidebar-surface {
+    @apply bg-[hsl(var(--chat-sidebar))] border-border/50;
+  }
+
+  .tool-action {
+    @apply opacity-0 transition-opacity duration-200 group-hover:opacity-100;
+  }
+}
+
+/* Scrollbar (subtle) */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #e7eae9;
+  border-radius: 9999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #a8c3a0;
 }

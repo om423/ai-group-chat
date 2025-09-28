@@ -31,7 +31,9 @@ export const selfReferencingAgent = new Agent({
 - Coordinate between different specialized agents
 
 When you need specialized help, delegate to the appropriate agent using the ask_* tools.`,
-  model: openai("gpt-4o-mini"),
+  model: openai("gpt-4o-mini", {
+    apiKey: process.env.OPENAI_API_KEY || "sk-test-key",
+  }),
   tools: async () => {
     // Tools resolve when needed, not during initialization
     const mcpClient = new (await import("@mastra/mcp")).MCPClient({
