@@ -197,7 +197,7 @@ export default function Page() {
 
   async function runLabelRestricted() {
     try {
-      const result = await labelMessage({ messageId: "demo", label: "restricted", classification: "restricted", as: asRole });
+      const result = await labelMessage({ roomId: roomId || "demo", classification: "restricted", as: asRole });
       setLog(l => [`ALLOW labelMessage (restricted) → ${JSON.stringify(result)}`, ...l]);
     } catch (e: any) {
       setLog(l => [`DENY labelMessage (restricted) → ${e.message}`, ...l]);
@@ -206,7 +206,7 @@ export default function Page() {
 
   async function runLabelInternal() {
     try {
-      const result = await labelMessage({ messageId: "demo", label: "internal", classification: "internal", as: asRole });
+      const result = await labelMessage({ roomId: roomId || "demo", classification: "internal", as: asRole });
       setLog(l => [`ALLOW labelMessage (internal) → ${JSON.stringify(result)}`, ...l]);
     } catch (e: any) {
       setLog(l => [`DENY labelMessage (internal) → ${e.message}`, ...l]);
@@ -221,7 +221,7 @@ export default function Page() {
     try {
       const res = await fetch(`${AGENT_BASE}/events/user-joined`, {
         method: "POST",
-        headers: { "content-type": "application/json", ...principalHeaders(asRole) } as any,
+        headers: { "content-type": "application/json", ...principalHeaders(asRole) },
         body: JSON.stringify({ roomId })
       });
       const data = await res.json();
@@ -313,71 +313,64 @@ export default function Page() {
 
   if (roomId) {
     return (
-      <ChatShell 
-        roomId={roomId}
-        left={
-          <ThreadsPanel
-            rooms={rooms}
-            currentRoomId={roomId}
-            onRoomSelect={setRoomId}
-            threads={threads}
-            activeThread={activeThread}
-            onThreadSelect={openThread}
-            onCreateThread={onCreateThread}
-          />
-        }
-        center={
-          <div className="flex flex-col h-full">
-            {/* Chat Messages */}
-            <div className="flex-1 overflow-hidden">
-              <MessageList
-                messages={chat}
-                labelsByMessage={labelsByMessage}
-                onForkFromMessage={handleForkFromMessage}
-                onLabel={handleLabel}
-                onCopyId={handleCopyId}
-              />
-            </div>
-            
-            {/* Composer */}
-            <div className="border-t border-border bg-card/60 p-3">
-              <Composer
-                value={input}
-                onChange={setInput}
-                onSubmit={onSend}
-                onAttach={onUploadChange}
-                disabled={sendingRef.current}
-              />
-            </div>
+      <ChatShell roomId={roomId}>
+        <ThreadsPanel
+          rooms={rooms}
+          currentRoomId={roomId}
+          onRoomSelect={setRoomId}
+          threads={threads}
+          activeThread={activeThread}
+          onThreadSelect={openThread}
+          onCreateThread={onCreateThread}
+        />
+        
+        <div className="flex flex-col h-full">
+          {/* Chat Messages */}
+          <div className="flex-1 overflow-hidden">
+            <MessageList
+              messages={chat}
+              labelsByMessage={labelsByMessage}
+              onForkFromMessage={handleForkFromMessage}
+              onLabel={handleLabel}
+              onCopyId={handleCopyId}
+            />
           </div>
-        }
-        right={
-          <RightPanel
-            socketConnected={socketConnected}
-            lastRTT={lastRTT}
-            roomId={roomId}
-            asRole={asRole}
-            onRoleChange={setAsRole}
-            onRoomChange={setRoomId}
-            showDemo={showDemo}
-            visibility={visibility}
-            onVisibilityChange={setVisibility}
-            k={k}
-            onKChange={setK}
-            classification={classification}
-            onClassificationChange={setClassification}
-            fileId={fileId}
-            onUploadChange={onUploadChange}
-            onAnalyze={runAnalyze}
-            onLabelInternal={runLabelInternal}
-            onLabelRestricted={runLabelRestricted}
-            onCreateThread={runCreate}
-            onSummarize={runSummarize}
-            onSendWelcomeBrief={sendWelcomeBrief}
-            traces={traces}
+          
+          {/* Composer */}
+          <Composer
+            value={input}
+            onChange={setInput}
+            onSubmit={onSend}
+            onAttach={onUploadChange}
+            disabled={sendingRef.current}
           />
-        }
-      />
+        </div>
+        
+        <RightPanel
+          socketConnected={socketConnected}
+          lastRTT={lastRTT}
+          roomId={roomId}
+          asRole={asRole}
+          onRoleChange={setAsRole}
+          onRoomChange={setRoomId}
+          showDemo={showDemo}
+          visibility={visibility}
+          onVisibilityChange={setVisibility}
+          k={k}
+          onKChange={setK}
+          classification={classification}
+          onClassificationChange={setClassification}
+          fileId={fileId}
+          onUploadChange={onUploadChange}
+          onAnalyze={runAnalyze}
+          onLabelInternal={runLabelInternal}
+          onLabelRestricted={runLabelRestricted}
+          onCreateThread={runCreate}
+          onSummarize={runSummarize}
+          onSendWelcomeBrief={sendWelcomeBrief}
+          traces={traces}
+        />
+      </ChatShell>
     );
   }
 

@@ -26,7 +26,10 @@ import { execPostAsAgent, postAsAgentImpl, validatePostAsAgent } from "./tools/p
 import { Rooms } from "./state/rooms";
 import { AgentMessages } from "./state/messages";
 import { ChatState, ChatMsg } from "./state/chat";
-import { maybeRespondToUserMessage } from "./agents/facilitator";
+import { startFacilitator } from "./agents/facilitator";
+import { startDocAnalyst } from "./agents/docAnalyst";
+import { startSummarizer } from "./agents/summarizer";
+import { emit } from "./bus/events";
 
 const PORT = 4111;
 const app = express();
@@ -295,5 +298,41 @@ app.post("/rooms", async (req, res) => {
   const doc = await RoomModel.create({ roomId, name, orgId: "org-1" });
   res.json({ ok: true, room: doc });
 });
+
+// Add endpoint to get file analysis
+app.get("/files/:fileId/analysis", async (req, res) => {
+  try {
+    const { DocAnalysisModel } = await import("./db/models");
+    const analysis = await DocAnalysisModel.findOne({ fileId: req.params.fileId });
+    
+    if (!analysis) {
+      return res.status(404).json({ ok: false, error: "Analysis not found" });
+    }
+    
+    res.json({ ok: true, analysis: analysis.analysis });
+  } catch (error) {
+    console.error("Error fetching analysis:", error);
+    res.status(500).json({ ok: false, error: "Internal server error" });
+  }
+});
+
+// Add endpoint to trigger manual summary
+app.post("/summarize/:roomId", async (req, res) => {
+  try {
+    const { triggerSummary } = await import("./agents/summarizer");
+    const { type = "rolling" } = req.body;
+    
+    await triggerSummary(req.params.roomId, type);
+    res.json({ ok: true, message: "Summary triggered" });
+  } catch (error: any) {
+    console.error("Error triggering summary:", error);
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+// Start the agents
+startFacilitator();
+startDocAnalyst();
+startSummarizer();
 
 server.listen(PORT, () => console.log(`[agent] listening on :${PORT}`));

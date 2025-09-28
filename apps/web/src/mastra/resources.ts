@@ -46,3 +46,4 @@ export const listAvailableResources = async () => {
   
   return resources;
 };
+

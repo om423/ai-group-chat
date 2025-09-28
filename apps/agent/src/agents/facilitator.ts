@@ -1,103 +1,173 @@
-import { ChatState } from "../state/chat";
-import { shouldAIReplyImplicit, answerQuestion } from "../llm/decider";
-import { ioEmit } from "../ws/emit";
+import { on, emit, MessageCreatedEvent } from "../bus/events";
+import { Decision, prefilters, heuristicShouldSpeak, llmShouldSpeak, chooseAction } from "./facilitator_decision";
 import { executeWithPolicy } from "../auth/pdp";
 import { postAsAgentImpl } from "../tools/postAsAgent";
 import { summarizeImpl } from "../tools/summarizeWindow";
-import { getPrincipalFromMsg } from "./principalFromMsg";
-import { Rooms } from "../state/rooms";
+import { createThreadImpl } from "../tools/createThread";
+import { getOpenAI } from "../llm/provider";
+import { ChatState } from "../state/chat";
+import { AgentFlags, AgentConfig } from "../state/agents";
+import { ioEmit } from "../ws/emit";
 import { MessageModel } from "../db/models";
 
-const COOLDOWN_MS = 20_000; // simple debounce to avoid spam
+const COOLDOWN_MS = AgentConfig.facilitator.cooldownMs;
+const RECAP_THRESHOLD = AgentConfig.facilitator.recapThreshold;
 
-// Policy-gated executors we already have:
-const execPostAsAgent = executeWithPolicy(
-  "PostAsAgent",
-  (args: { roomId: string }) => {
-    const rc = Rooms.get(args.roomId);
-    return { type: "Room", id: args.roomId, orgId: rc.orgId, teacherPresent: rc.teacherPresent };
-  }
+// Policy-gated executors for facilitator actions
+const execPost = executeWithPolicy(
+  "PostAsAgent", 
+  (args: { roomId: string }) => ({ type: "Room", id: args.roomId, orgId: "org-1", teacherPresent: true })
 );
-const execSummarize = executeWithPolicy(
-  "Summarize",
-  (args: { roomId: string, k: number }) => {
-    const rc = Rooms.get(args.roomId);
-    return { type: "Room", id: args.roomId, orgId: rc.orgId, teacherPresent: rc.teacherPresent };
-  },
+
+const execSumm = executeWithPolicy(
+  "Summarize", 
+  (args: { roomId: string, k: number }) => ({ type: "Room", id: args.roomId, orgId: "org-1", teacherPresent: true }),
   (args) => ({ windowSize: args.k })
 );
 
-// Decide & respond if needed
-export async function maybeRespondToUserMessage(msg: { roomId: string; authorId: string; text: string }) {
-  const now = Date.now();
-  const last = ChatState.lastAIPost(msg.roomId);
-  if (now - last < COOLDOWN_MS) return; // cool down
+const execThread = executeWithPolicy(
+  "CreateThread", 
+  (args: { roomId: string }) => ({ type: "Room", id: args.roomId, orgId: "org-1", teacherPresent: true })
+);
 
-  // explicit trigger?
-  const trimmed = msg.text.trim();
-  const explicit = /^(@ai|\/ai)\b/i.test(trimmed);
-  const cleaned = explicit ? trimmed.replace(/^(@ai|\/ai)\s*/i, "") : trimmed;
+// Facilitator Agent System Prompt
+const FACILITATOR_SYSTEM_PROMPT = `You are a concise, helpful assistant embedded in a multi-user group chat.
+Only answer when asked or clearly helpful. Prefer short, correct answers with concrete steps/examples.
+If uncertain, say what's missing and propose a next step.`;
 
-  // Get recent messages from MongoDB
-  const recentMessages = await MessageModel.find({ roomId: msg.roomId })
-    .sort({ ts: -1 })
-    .limit(12);
-  
-  const recent = recentMessages.reverse().map(m => `${m.authorType}:${m.text}`);
-  const recentPairs = recentMessages.slice(-8).reverse().map(m => ({
-    role: m.authorType === "Agent" ? "assistant" : "user",
-    content: m.text
-  }));
+export function startFacilitator() {
+  on("message.created", async (m: MessageCreatedEvent) => {
+    if (!AgentFlags.facilitator) return;
+    if (m.authorType !== "User") return;
 
-  let should = false;
-  let reason = "none";
-  if (explicit) {
-    should = true;
-    reason = "explicit";
-  } else {
-    const dec = await shouldAIReplyImplicit(cleaned, recent);
-    should = dec.should;
-    reason = dec.reason;
-  }
+    const now = Date.now();
+    if (now - ChatState.lastAIPost(m.roomId) < COOLDOWN_MS) return;
 
-  if (!should) return;
+    // Get recent messages from MongoDB
+    const recentMessages = await MessageModel.find({ roomId: m.roomId })
+      .sort({ ts: -1 })
+      .limit(AgentConfig.facilitator.maxContext);
 
-  // Produce answer
-  const answer = await answerQuestion(msg.roomId, cleaned, recentPairs);
+    const recent = recentMessages.reverse();
+    const lines = recent.map(x => `${x.authorType}:${x.text}`);
+    const hasHumanMention = /@\w+/.test(m.text);
 
-  // Build a principal for the agent (least-privileged)
-  const principal = getPrincipalFromMsg({ type: "Agent", id: "facilitator", orgId: "org-1", name: "FacilitatorAgent" });
+    // Apply prefilters
+    if (prefilters(m.text) === "BLOCK") return;
 
-  // Optionally summarize if conversation is long (demo: > 15 msgs)
-  const totalMessages = await MessageModel.countDocuments({ roomId: msg.roomId });
-  if (totalMessages > 15) {
+    let speak = false;
+    let reason = "";
+
+    // Explicit trigger
+    if (/^(@ai|\/ai)\b/i.test(m.text)) {
+      speak = true;
+      reason = "explicit";
+    }
+    // Heuristic quick win
+    else if (heuristicShouldSpeak(m.text, hasHumanMention)) {
+      speak = true;
+      reason = "heuristic";
+    }
+    // LLM classifier fallback
+    else {
+      speak = await llmShouldSpeak(m.text, lines);
+      reason = "llm";
+    }
+
+    if (!speak) return;
+
+    // Choose action
+    const decision: Decision = chooseAction(m.text, recent.length);
+    
     try {
-      await execSummarize(principal, summarizeImpl, { roomId: msg.roomId, k: 30 });
-    } catch { /* ignore summarizes denied */ }
-  }
+      if (decision.mode === "SPEAK") {
+        const openai = getOpenAI();
+        const msgPairs = recent.slice(-8).map(x => ({
+          role: x.authorType === "Agent" ? "assistant" : "user",
+          content: x.text
+        }));
+        
+        const response = await openai.chat.completions.create({
+          model: AgentConfig.facilitator.model,
+          temperature: 0.3,
+          messages: [
+            { role: "system", content: FACILITATOR_SYSTEM_PROMPT },
+            ...msgPairs,
+            { role: "user", content: m.text.replace(/^(@ai|\/ai)\s*/i, "") }
+          ],
+          max_tokens: AgentConfig.facilitator.maxTokens
+        });
 
-  // Post the agent reply (policy-gated)
-  try {
-    await execPostAsAgent(principal, postAsAgentImpl, { roomId: msg.roomId, text: answer });
-    ChatState.markAIPost(msg.roomId);
-    ioEmit("agent:trace", {
-      ts: Date.now(),
-      phase: "success",
-      action: "FacilitatorReply",
-      principal: { type: "Agent", id: "facilitator" },
-      resource: { type: "Room", id: msg.roomId },
-      decision: "Allow",
-      reason
-    });
-  } catch (e: any) {
-    ioEmit("agent:trace", {
-      ts: Date.now(),
-      phase: "denied",
-      action: "FacilitatorReply",
-      principal: { type: "Agent", id: "facilitator" },
-      resource: { type: "Room", id: msg.roomId },
-      decision: "Deny",
-      reason: e?.message || "Denied"
-    });
-  }
+        const text = response.choices[0]?.message?.content ?? "I'm not sure yet.";
+        
+        await execPost(
+          { type: "Agent", id: "facilitator", name: "FacilitatorAgent", orgId: "org-1" },
+          () => postAsAgentImpl(m.roomId, text)
+        );
+      } 
+      else if (decision.mode === "ACT" && decision.action === "summarize") {
+        await execSumm(
+          { type: "Agent", id: "facilitator", name: "FacilitatorAgent", orgId: "org-1" },
+          () => summarizeImpl(m.roomId, decision.args.k)
+        );
+      } 
+      else if (decision.mode === "ACT" && decision.action === "createThread") {
+        await execThread(
+          { type: "Agent", id: "facilitator", name: "FacilitatorAgent", orgId: "org-1" },
+          () => createThreadImpl(m.roomId, decision.args.visibility)
+        );
+      }
+
+      ChatState.markAIPost(m.roomId);
+      
+      // Emit telemetry
+      ioEmit("agent:trace", {
+        ts: Date.now(),
+        phase: "success",
+        action: "Facilitator",
+        principal: { type: "Agent", id: "facilitator" },
+        resource: { type: "Room", id: m.roomId },
+        decision: "Allow",
+        reason: `${decision.mode}-${reason}`
+      });
+
+      // Structured logging
+      console.log(`facilitator.decide: { roomId: ${m.roomId}, explicit: ${reason === "explicit"}, heuristic: ${reason === "heuristic"}, llm: ${reason === "llm"}, decision: ${decision.mode} }`);
+      
+    } catch (e: any) {
+      // Fallback to simple assistant reply on error
+      try {
+        await execPost(
+          { type: "Agent", id: "facilitator", name: "FacilitatorAgent", orgId: "org-1" },
+          () => postAsAgentImpl(m.roomId, "I'm having trouble processing that right now. Could you try rephrasing your question?")
+        );
+      } catch (fallbackError) {
+        console.error("Facilitator fallback also failed:", fallbackError);
+      }
+
+      ioEmit("agent:trace", {
+        ts: Date.now(),
+        phase: "denied",
+        action: "Facilitator",
+        principal: { type: "Agent", id: "facilitator" },
+        resource: { type: "Room", id: m.roomId },
+        decision: "Deny",
+        reason: e?.message || "unknown-error"
+      });
+
+      console.error("Facilitator error:", e);
+    }
+  });
+}
+
+// Legacy function for backward compatibility
+export async function maybeRespondToUserMessage(msg: { roomId: string; authorId: string; text: string }) {
+  // Emit event to trigger the new facilitator
+  emit("message.created", {
+    roomId: msg.roomId,
+    authorType: "User",
+    authorId: msg.authorId,
+    text: msg.text,
+    ts: Date.now()
+  });
 }

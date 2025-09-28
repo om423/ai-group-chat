@@ -6,6 +6,7 @@ type StoredFile = {
   mime: string;
   classification: "public" | "internal" | "restricted";
   path: string; // local temp path
+  size?: number;
 };
 
 const _files = new Map<string, StoredFile>();

@@ -10,3 +10,4 @@ export { getMCPPrompts, getWeatherPrompts, getPromptMessages, listAvailablePromp
 export type { MCPClient, MCPServer } from "@mastra/mcp";
 export type { Agent } from "@mastra/core/agent";
 export type { Tool } from "@mastra/core/tools";
+
